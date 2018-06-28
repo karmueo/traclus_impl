@@ -156,16 +156,16 @@ class TrajectoryClusterFactory(ClusterFactory):
 BestAvailableClusterCandidateIndex = None
 import sys, os
 try:
-    BestAvailableClusterCandidateIndex = TrajectoryLineSegmentCandidateIndex
-    print("Using a normal for clustering")
-    sys.stderr.write(str(os.path.realpath(__file__)) + ": rtree import failed." + \
-                     " Using plain python quadratic clustering")
+    # BestAvailableClusterCandidateIndex = TrajectoryLineSegmentCandidateIndex
+    # print("Using a normal for clustering")
+    # sys.stderr.write(str(os.path.realpath(__file__)) + ": rtree import failed." + \
+    #                  " Using plain python quadratic clustering")
 
-    # from rtree import index
-    # BestAvailableClusterCandidateIndex = RtreeTrajectoryLineSegmentCandidateIndex
-    # sys.stderr.write(str(os.path.realpath(__file__)) + ": rtree import succeeded." + \
-    #                  " Using an r-tree for clustering")
-    # print("Using an r-tree for clustering")
+    from rtree import index
+    BestAvailableClusterCandidateIndex = RtreeTrajectoryLineSegmentCandidateIndex
+    sys.stderr.write(str(os.path.realpath(__file__)) + ": rtree import succeeded." + \
+                     " Using an r-tree for clustering")
+    print("Using an r-tree for clustering")
 except ImportError:
     BestAvailableClusterCandidateIndex = TrajectoryLineSegmentCandidateIndex
     sys.stderr.write(str(os.path.realpath(__file__)) + ": rtree import failed." + \

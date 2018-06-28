@@ -3,7 +3,7 @@ Created on Jan 10, 2016
 
 @author: Alex
 '''
-from traclus_impl.generic_dbscan import dbscan
+from traclus_impl.generic_dbscan import dbscan, dbscan_para_learning
 import traclus_impl.hooks as hooks
 from traclus_impl.line_segment_averaging import get_representative_line_from_trajectory_line_segments
 from traclus_impl.traclus_dbscan import TrajectoryLineSegmentFactory, \
@@ -14,7 +14,8 @@ from traclus_impl.trajectory_partitioning import get_line_segment_from_points, \
 
 def train_traclus(point_iterable_list, epsilon, min_neighbors, \
                 min_vertical_lines, \
-                clusters_hook=hooks.clusters_hook):
+                clusters_hook=hooks.clusters_hook,
+                is_learning=False):
     cleaned_input = []
     for traj in map(lambda l: with_spikes_removed(l), point_iterable_list):
         cleaned_traj = []
@@ -32,7 +33,8 @@ def train_traclus(point_iterable_list, epsilon, min_neighbors, \
                                epsilon=epsilon, \
                                min_neighbors=min_neighbors, \
                                min_vertical_lines=min_vertical_lines, \
-                               clusters_hook=clusters_hook)
+                               clusters_hook=clusters_hook, \
+                               is_learning=is_learning)
 
 
 
@@ -82,8 +84,14 @@ def with_spikes_removed(trajectory):
 
 def train_get_clusters(point_iterable_list, epsilon, min_neighbors, \
                         min_vertical_lines, \
-                        clusters_hook=hooks.clusters_hook):
+                        clusters_hook=hooks.clusters_hook,
+                       is_learning=False):
     trajectory_line_segment_factory = TrajectoryLineSegmentFactory()
+
+    def _dbscan_para_learn(cluster_candidates):
+        print("start learning para")
+        line_seg_index = BestAvailableClusterCandidateIndex(cluster_candidates, epsilon)
+        return dbscan_para_learning(cluster_candidates_index=line_seg_index, min_neighbors=min_neighbors)
 
     def _dbscan_caller(cluster_candidates):
         # cluster_candidates为切分后的所有线段
@@ -103,10 +111,18 @@ def train_get_clusters(point_iterable_list, epsilon, min_neighbors, \
             line_seg_from_points_func=get_line_segment_from_points, \
             partitioned_points_hook=None)
 
-    cluster_iter_from_points_caller = get_cluster_iterable_from_all_points_iterable_caller(
+    if is_learning:
+        cluster_iter_from_points_caller = get_cluster_iterable_from_all_points_iterable_caller(
+            is_learning = is_learning, \
             get_all_traj_segs_from_all_points_caller=all_traj_segs_iter_from_all_points_caller, \
-            dbscan_caller=_dbscan_caller, \
+            dbscan_caller=_dbscan_para_learn, \
             clusters_hook=clusters_hook)
+    else:
+        cluster_iter_from_points_caller = get_cluster_iterable_from_all_points_iterable_caller(
+                is_learning=is_learning, \
+                get_all_traj_segs_from_all_points_caller=all_traj_segs_iter_from_all_points_caller, \
+                dbscan_caller=_dbscan_caller, \
+                clusters_hook=clusters_hook)
 
     clusters = cluster_iter_from_points_caller(point_iterable_list)
     return clusters
@@ -143,21 +159,30 @@ def the_whole_enchilada(point_iterable_list, epsilon, min_neighbors, min_num_tra
                                                                      get_representative_line_seg_from_trajectory_caller=representative_line_from_trajectory_caller, \
                                                                      min_num_trajectories_in_cluster=min_num_trajectories_in_cluster)
 
-def get_cluster_iterable_from_all_points_iterable_caller(get_all_traj_segs_from_all_points_caller, \
+def get_cluster_iterable_from_all_points_iterable_caller(is_learning, \
+                                                  get_all_traj_segs_from_all_points_caller, \
                                                   dbscan_caller, \
                                                   clusters_hook):
     def _func(point_iterable_list):
         import time
         start = time.time()
-        clusters, noises = get_cluster_iterable_from_all_points_iterable(point_iterable_list=point_iterable_list, \
-                                                             get_all_traj_segs_from_all_points_caller=get_all_traj_segs_from_all_points_caller, \
-                                                             dbscan_caller=dbscan_caller)
-        end = time.time()
-        print('训练时间为%f秒' % (end-start))
+        if is_learning:
+            ep_list = get_cluster_iterable_from_all_points_iterable(point_iterable_list=point_iterable_list, \
+                                                          get_all_traj_segs_from_all_points_caller=get_all_traj_segs_from_all_points_caller, \
+                                                          dbscan_caller=dbscan_caller)
+            end = time.time()
+            print('训练时间为%f秒' % (end - start))
+            return ep_list
+        else:
+            clusters, noises = get_cluster_iterable_from_all_points_iterable(point_iterable_list=point_iterable_list, \
+                                                                 get_all_traj_segs_from_all_points_caller=get_all_traj_segs_from_all_points_caller, \
+                                                                 dbscan_caller=dbscan_caller)
 
-        if clusters_hook:
-            clusters_hook(clusters, noises)
-        return clusters
+            if clusters_hook:
+                clusters_hook(clusters, noises)
+            end = time.time()
+            print('训练时间为%f秒' % (end - start))
+            return clusters
     return _func
 
 def get_representative_lines_from_trajectory_caller(min_vertical_lines, min_prev_dist):

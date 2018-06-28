@@ -42,6 +42,26 @@ class ClusterCandidateIndex:
             if item != cluster_candidate and dis<= self.epsilon and dis!=0:
                 neighbors.append(item)          
         return neighbors
+
+    def find_epsilon_of(self, cluster_candidate, min_neighbors, learning_rate):
+        """
+        根据给定的最小核心线段数，找到最小的核心距离
+        :param cluster_candidate:线段集合
+        :param min_neighbors: 最小核心线段数
+        :param learning_rate: 学习步长
+        :return:
+        """
+        neighbors = 0
+        e = 0
+        while 1:
+            e = e + learning_rate
+            for item in self.candidates:
+                dis = cluster_candidate.distance_to_candidate(item)
+                if item != cluster_candidate and dis<= e:
+                    neighbors = neighbors + 1
+                    if neighbors >= min_neighbors:
+                        return e
+
     
 class Cluster:
     def __init__(self):
@@ -83,6 +103,20 @@ class Cluster:
 class ClusterFactory():
     def new_cluster(self):
         return Cluster()
+
+def dbscan_para_learning(cluster_candidates_index, min_neighbors, learning_rate=50):
+    """
+    根据给定的最小核心线段数，找到最小的核心距离
+    :param cluster_candidates_index: 线段集合
+    :param min_neighbors: 最小近邻线段数
+    :param learning_rate: 学习步长
+    :return: 所有线段的核心距离
+    """
+    e_list = []
+    for item in cluster_candidates_index.candidates:
+        ep = cluster_candidates_index.find_epsilon_of(item, min_neighbors, learning_rate)
+        e_list.append(ep)
+    return e_list
         
 def dbscan(cluster_candidates_index, min_neighbors, cluster_factory, getnoise=False):
     clusters = []
